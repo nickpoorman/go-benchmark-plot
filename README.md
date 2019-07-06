@@ -2,6 +2,8 @@
 
 Plot Go benchmarks on a graph.
 
+[![GoDoc](https://godoc.org/github.com/nickpoorman/go-benchmark-plot?status.svg)](https://godoc.org/github.com/nickpoorman/go-benchmark-plot)
+
 ## To Use
 
 Run your benchmarks and then pipe them into benchplot.
