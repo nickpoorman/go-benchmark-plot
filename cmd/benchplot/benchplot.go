@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"math"
 	"time"
 
 	"github.com/nickpoorman/go-benchmark-plot/parse"
@@ -16,11 +17,52 @@ import (
 	"gonum.org/v1/plot/vg"
 )
 
-func CreateGrapth(benchName string, xdata, ydata []float64, format string, xPredictMultiplier float64) {
+func formula(degree int) string {
+	char := 'a'
+	asciiA := int(char)
+
+	f := "f(x) = "
+	for i := 0; i <= degree+1; i++ {
+		if i == 0 {
+			f += string(asciiA + i)
+		} else if i == 1 {
+			f = fmt.Sprintf("%s + %s*x", f, string(asciiA+i))
+		} else {
+			f = fmt.Sprintf("%s + %s*x^%d", f, string(asciiA+i), i)
+		}
+	}
+	return f
+}
+
+func formulaCoef(ps []float64) string {
+	f := "f(x) = "
+	for i := 0; i < len(ps); i++ {
+		if i == 0 {
+			f = fmt.Sprintf("%f", ps[i])
+		} else if i == 1 {
+			f = fmt.Sprintf("%s + %f*x", f, ps[i])
+		} else {
+			f = fmt.Sprintf("%s + %f*x^%d", f, ps[i], i)
+		}
+	}
+	return f
+}
+
+func CreateGrapth(benchName string, xdata, ydata []float64, format string, xPredictMultiplier float64, degree int) {
 	// This is our function to minimize.
 	// ps is the slice of parameters to optimize during the fit.
 	poly := func(x float64, ps []float64) float64 {
-		return ps[0] + ps[1]*x*x
+		// return ps[0] + ps[1]*x + ps[2]*x*x
+		var f float64
+		for i := 0; i <= degree+1; i++ {
+			f += ps[i] * math.Pow(x, float64(i))
+		}
+		return f
+	}
+
+	ps := make([]float64, degree+2)
+	for i := range ps {
+		ps[i] = 1.0
 	}
 
 	res, err := fit.Curve1D(
@@ -33,7 +75,7 @@ func CreateGrapth(benchName string, xdata, ydata []float64, format string, xPred
 			// Ps is the initial values for the parameters.
 			// If Ps is nil, the set of initial parameters values is a slice of
 			// length N filled with zeros.
-			Ps: []float64{1, 1},
+			Ps: ps,
 		},
 		nil, &optimize.NelderMead{},
 	)
@@ -49,7 +91,7 @@ func CreateGrapth(benchName string, xdata, ydata []float64, format string, xPred
 		xMax := mat.Max(mat.NewVecDense(len(xdata), xdata)) * xPredictMultiplier
 
 		p := hplot.New()
-		p.X.Label.Text = fmt.Sprintf("f(x) = a + b*x*x\nf(x) = %g + %g*x*x", res.X[0], res.X[1])
+		p.X.Label.Text = fmt.Sprintf("%s\n%s", formula(degree), formulaCoef(res.X))
 		p.Y.Label.Text = "ms/op"
 
 		s := hplot.NewS2D(hplot.ZipXY(xdata, ydata))
@@ -80,6 +122,7 @@ func main() {
 	var format = flag.String("format", "svg", "Image extension to be used. Supported extensions are: .eps, .jpg, .jpeg, .pdf, .png, .svg, .tif and .tiff")
 	var xPredictMultiplier = flag.Float64("xPredictMultiplier", 1.7, "Multiplier used to predict values beyond max benchmarked arg")
 	var useMillis = flag.Bool("useMillis", true, "Use milliseconds when writing the ns/op benchmarks")
+	var degree = flag.Int("degree", 1, "The degree for the polynomial function to minimize")
 	flag.Parse()
 
 	results := parse.ParseBenchmarks(*useMillis)
@@ -91,6 +134,6 @@ func main() {
 			xdata = append(xdata, arg)
 			ydata = append(ydata, opsNs)
 		}
-		CreateGrapth(benchName, xdata, ydata, *format, *xPredictMultiplier)
+		CreateGrapth(benchName, xdata, ydata, *format, *xPredictMultiplier, *degree)
 	}
 }
